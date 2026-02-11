@@ -81,7 +81,8 @@ function setupEventListeners() {
 
 // Lógica de Negocio
 async function analyzeFood() {
-    const description = document.getElementById('food-description').value.toLowerCase();
+    const descInput = document.getElementById('food-description');
+    const description = descInput.value.toLowerCase();
     const resultsPanel = document.getElementById('results-panel');
     const analyzeBtn = document.getElementById('analyze-btn');
     const photoInput = document.getElementById('food-photo');
@@ -91,18 +92,23 @@ async function analyzeFood() {
         return;
     }
 
-    // Reset UI State
     analyzeBtn.disabled = true;
     analyzeBtn.textContent = "Analizando con IA...";
     resultsPanel.classList.add('hidden');
 
     // Caso 1: Intentar con Gemini si hay API Key
-    if (USER_CONFIG.GEMINI_KEY && USER_CONFIG.GEMINI_KEY.length > 10) {
+    if (USER_CONFIG.GEMINI_KEY && USER_CONFIG.GEMINI_KEY.length > 20) {
         try {
             const result = await callGeminiAI(description, photoInput.files[0]);
             if (result && result.carbs !== undefined) {
                 document.getElementById('res-carbs').textContent = `${result.carbs}g`;
                 document.getElementById('res-gi').textContent = result.gi || 'Medio';
+
+                // Actualizar descripción con lo detectado por la IA
+                if (result.foods_detected) {
+                    descInput.value = result.foods_detected.join(", ");
+                }
+
                 resultsPanel.classList.remove('hidden');
                 updateDoseDisplay();
                 resetAnalyzeButton();
@@ -110,18 +116,18 @@ async function analyzeFood() {
             }
         } catch (e) {
             console.error("Gemini Error:", e);
-            alert("Error con Gemini: " + e.message + ". Usando base de datos local.");
+            alert("Fallo IA: " + e.message + ". Usando base local.");
         }
-    } else if (USER_CONFIG.GEMINI_KEY === '' && photoInput.files.length > 0) {
-        alert("Configura tu Gemini API Key en Ajustes para analizar fotos.");
+    } else if (photoInput.files.length > 0 && !USER_CONFIG.GEMINI_KEY) {
+        alert("Configura tu Gemini API Key para analizar fotos.");
     }
 
-    // Caso 2: Fallback a Database Local (solo texto)
+    // Caso 2: Fallback a Database Local
     let totalCarbs = 0;
     let mainGI = 'Bajo';
     let found = false;
 
-    if (description) {
+    if (description && !description.includes("analizando")) {
         FOOD_DATABASE.forEach(food => {
             if (description.includes(food.name)) {
                 totalCarbs += food.carbs;
@@ -132,7 +138,6 @@ async function analyzeFood() {
         });
     }
 
-    // Si hay foto pero no IA ni texto reconocido, damos un genérico
     if (!found && photoInput.files.length > 0) {
         totalCarbs = 30;
         mainGI = 'Medio';
@@ -140,7 +145,7 @@ async function analyzeFood() {
     }
 
     if (found || description) {
-        if (!found) { totalCarbs = 30; mainGI = 'Medio'; } // Genérico fallback
+        if (!found) { totalCarbs = 30; mainGI = 'Medio'; }
         document.getElementById('res-carbs').textContent = `${totalCarbs}g`;
         document.getElementById('res-gi').textContent = mainGI;
         resultsPanel.classList.remove('hidden');
@@ -157,10 +162,14 @@ function resetAnalyzeButton() {
 }
 
 async function callGeminiAI(description, file) {
-    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${USER_CONFIG.GEMINI_KEY}`;
+    // CAMBIO A V1 y verificación de nombre de modelo
+    const API_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${USER_CONFIG.GEMINI_KEY}`;
 
     let parts = [];
-    if (description) parts.push({ text: `Alimento descrito: ${description}` });
+    if (description && !description.includes("analizando")) {
+        parts.push({ text: `Alimento descrito por el usuario: ${description}` });
+    }
+
     if (file) {
         const base64 = await fileToBase64(file);
         parts.push({
@@ -171,7 +180,7 @@ async function callGeminiAI(description, file) {
         });
     }
 
-    parts.push({ text: "Analiza nutricionalmente este plato para un paciente con DM1. Estima los gramos totales de carbohidratos netos y el índice glucémico predominante (Alto, Medio, Bajo). Responde ÚNICAMENTE en este formato JSON: {\"carbs\": número, \"gi\": \"Alto/Medio/Bajo\"}" });
+    parts.push({ text: "Analiza nutricionalmente este plato para un paciente con diabetes tipo 1. Identifica los alimentos presentes. Estima carbohidratos netos totales y el índice glucémico (Alto, Medio o Bajo). Responde estrictamente en formato JSON: {\"carbs\": número, \"gi\": \"Alto/Medio/Bajo\", \"foods_detected\": [\"alimento 1\", \"alimento 2\"]}" });
 
     const response = await fetch(API_URL, {
         method: 'POST',
@@ -180,17 +189,18 @@ async function callGeminiAI(description, file) {
     });
 
     if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error?.message || "Error de conexión");
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error?.message || "Error de red");
     }
 
     const data = await response.json();
     try {
         const textResponse = data.candidates[0].content.parts[0].text;
+        // Limpiar posible formato markdown del JSON
         const cleanJson = textResponse.replace(/```json|```/g, '').trim();
         return JSON.parse(cleanJson);
     } catch (e) {
-        throw new Error("Respuesta de IA no válida");
+        throw new Error("Respuesta no legible");
     }
 }
 
