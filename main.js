@@ -70,7 +70,7 @@ function setupEventListeners() {
 
     fileInput.addEventListener('change', () => {
         if (fileInput.files.length > 0) {
-            document.getElementById('food-description').value = "Analizando foto...";
+            document.getElementById('food-description').value = "Foto seleccionada. Analizando...";
             analyzeFood();
         }
     });
@@ -106,7 +106,7 @@ async function analyzeFood() {
 
                 // Actualizar descripción con lo detectado por la IA
                 if (result.foods_detected) {
-                    descInput.value = result.foods_detected.join(", ");
+                    descInput.value = Array.isArray(result.foods_detected) ? result.foods_detected.join(", ") : result.foods_detected;
                 }
 
                 resultsPanel.classList.remove('hidden');
@@ -115,11 +115,11 @@ async function analyzeFood() {
                 return;
             }
         } catch (e) {
-            console.error("Gemini Error:", e);
-            alert("Fallo IA: " + e.message + ". Usando base local.");
+            console.error("Gemini Error Final:", e);
+            alert("⚠️ IA no disponible temporalmente: " + e.message + "\n\nSe usará la estimación básica local.");
         }
     } else if (photoInput.files.length > 0 && !USER_CONFIG.GEMINI_KEY) {
-        alert("Configura tu Gemini API Key para analizar fotos.");
+        alert("Configura tu Gemini API Key en Ajustes para analizar fotos.");
     }
 
     // Caso 2: Fallback a Database Local
@@ -127,9 +127,12 @@ async function analyzeFood() {
     let mainGI = 'Bajo';
     let found = false;
 
-    if (description && !description.includes("analizando")) {
+    // Limpiar texto de carga antes de buscar
+    const cleanText = description.replace("foto seleccionada. analizando...", "").trim();
+
+    if (cleanText) {
         FOOD_DATABASE.forEach(food => {
-            if (description.includes(food.name)) {
+            if (cleanText.includes(food.name)) {
                 totalCarbs += food.carbs;
                 if (food.gi === 'Alto') mainGI = 'Alto';
                 else if (food.gi === 'Medio' && mainGI === 'Bajo') mainGI = 'Medio';
@@ -139,12 +142,12 @@ async function analyzeFood() {
     }
 
     if (!found && photoInput.files.length > 0) {
-        totalCarbs = 30;
+        totalCarbs = 30; // Genérico para fotos sin IA
         mainGI = 'Medio';
         found = true;
     }
 
-    if (found || description) {
+    if (found || cleanText) {
         if (!found) { totalCarbs = 30; mainGI = 'Medio'; }
         document.getElementById('res-carbs').textContent = `${totalCarbs}g`;
         document.getElementById('res-gi').textContent = mainGI;
@@ -162,46 +165,62 @@ function resetAnalyzeButton() {
 }
 
 async function callGeminiAI(description, file) {
-    // CAMBIO A V1 y verificación de nombre de modelo
-    const API_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${USER_CONFIG.GEMINI_KEY}`;
+    // Lista de modelos a probar en orden de estabilidad
+    const models = ["gemini-1.5-flash", "gemini-1.5-flash-latest"];
+    let lastError = "";
 
-    let parts = [];
-    if (description && !description.includes("analizando")) {
-        parts.push({ text: `Alimento descrito por el usuario: ${description}` });
-    }
+    for (const model of models) {
+        try {
+            // Usamos v1beta para mayor compatibilidad con Flash
+            const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${USER_CONFIG.GEMINI_KEY}`;
 
-    if (file) {
-        const base64 = await fileToBase64(file);
-        parts.push({
-            inline_data: {
-                mime_type: file.type,
-                data: base64.split(',')[1]
+            let parts = [];
+            if (description && !description.includes("analizando")) {
+                parts.push({ text: `Contexto del usuario: ${description}` });
             }
-        });
+
+            if (file) {
+                const base64 = await fileToBase64(file);
+                parts.push({
+                    inline_data: {
+                        mime_type: file.type,
+                        data: base64.split(',')[1]
+                    }
+                });
+            }
+
+            parts.push({ text: "Analiza nutricionalmente este plato para un paciente con DM1. Identifica los alimentos específicos. Estima los gramos totales de carbohidratos netos y el índice glucémico (Alto, Medio o Bajo). Responde ÚNICAMENTE en este formato JSON: {\"carbs\": número, \"gi\": \"Alto/Medio/Bajo\", \"foods_detected\": [\"lista de alimentos\"]}" });
+
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts }] })
+            });
+
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                // Si el error es específicamente de "modelo no encontrado", probamos el siguiente
+                if (response.status === 404) {
+                    lastError = err.error?.message || "Model not found";
+                    continue;
+                }
+                throw new Error(err.error?.message || `HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            const textResponse = data.candidates[0].content.parts[0].text;
+            const cleanJson = textResponse.replace(/```json|```/g, '').trim();
+            return JSON.parse(cleanJson);
+
+        } catch (e) {
+            console.warn(`Intento con ${model} falló:`, e);
+            lastError = e.message;
+            // Si el error no es de "not found" (p.ej. API Key inválida), cortamos la ejecución
+            if (!e.message.toLowerCase().includes("not found")) break;
+        }
     }
 
-    parts.push({ text: "Analiza nutricionalmente este plato para un paciente con diabetes tipo 1. Identifica los alimentos presentes. Estima carbohidratos netos totales y el índice glucémico (Alto, Medio o Bajo). Responde estrictamente en formato JSON: {\"carbs\": número, \"gi\": \"Alto/Medio/Bajo\", \"foods_detected\": [\"alimento 1\", \"alimento 2\"]}" });
-
-    const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts }] })
-    });
-
-    if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.error?.message || "Error de red");
-    }
-
-    const data = await response.json();
-    try {
-        const textResponse = data.candidates[0].content.parts[0].text;
-        // Limpiar posible formato markdown del JSON
-        const cleanJson = textResponse.replace(/```json|```/g, '').trim();
-        return JSON.parse(cleanJson);
-    } catch (e) {
-        throw new Error("Respuesta no legible");
-    }
+    throw new Error(lastError || "No se pudo conectar con la IA tras varios intentos.");
 }
 
 function fileToBase64(file) {
