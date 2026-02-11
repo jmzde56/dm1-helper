@@ -1,0 +1,17 @@
+{
+  "name": "DM1 Helper Premium",
+  "short_name": "DM1 Helper",
+  "description": "Gestión de insulina bolus y nutrición para DM1",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#07090e",
+  "theme_color": "#3b82f6",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2864/2864248.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
