@@ -70,8 +70,8 @@ function setupEventListeners() {
 
     fileInput.addEventListener('change', () => {
         if (fileInput.files.length > 0) {
-            document.getElementById('food-description').value = "Analizando foto con IA...";
-            analyzeFood(); // Auto-analizar al seleccionar foto
+            document.getElementById('food-description').value = "Analizando foto...";
+            analyzeFood();
         }
     });
 
@@ -91,57 +91,67 @@ async function analyzeFood() {
         return;
     }
 
+    // Reset UI State
     analyzeBtn.disabled = true;
-    analyzeBtn.textContent = "Analizando...";
+    analyzeBtn.textContent = "Analizando con IA...";
+    resultsPanel.classList.add('hidden');
 
-    // Si hay API Key de Gemini, intentamos análisis por IA
-    if (USER_CONFIG.GEMINI_KEY) {
+    // Caso 1: Intentar con Gemini si hay API Key
+    if (USER_CONFIG.GEMINI_KEY && USER_CONFIG.GEMINI_KEY.length > 10) {
         try {
             const result = await callGeminiAI(description, photoInput.files[0]);
-            if (result) {
+            if (result && result.carbs !== undefined) {
                 document.getElementById('res-carbs').textContent = `${result.carbs}g`;
-                document.getElementById('res-gi').textContent = result.gi;
+                document.getElementById('res-gi').textContent = result.gi || 'Medio';
                 resultsPanel.classList.remove('hidden');
                 updateDoseDisplay();
-                analyzeBtn.disabled = false;
-                analyzeBtn.textContent = "Analizar";
+                resetAnalyzeButton();
                 return;
             }
         } catch (e) {
             console.error("Gemini Error:", e);
+            alert("Error con Gemini: " + e.message + ". Usando base de datos local.");
         }
+    } else if (USER_CONFIG.GEMINI_KEY === '' && photoInput.files.length > 0) {
+        alert("Configura tu Gemini API Key en Ajustes para analizar fotos.");
     }
 
-    // Fallback a Database Local
+    // Caso 2: Fallback a Database Local (solo texto)
     let totalCarbs = 0;
     let mainGI = 'Bajo';
     let found = false;
 
-    FOOD_DATABASE.forEach(food => {
-        if (description.includes(food.name)) {
-            totalCarbs += food.carbs;
-            if (food.gi === 'Alto') mainGI = 'Alto';
-            else if (food.gi === 'Medio' && mainGI === 'Bajo') mainGI = 'Medio';
-            found = true;
-        }
-    });
+    if (description) {
+        FOOD_DATABASE.forEach(food => {
+            if (description.includes(food.name)) {
+                totalCarbs += food.carbs;
+                if (food.gi === 'Alto') mainGI = 'Alto';
+                else if (food.gi === 'Medio' && mainGI === 'Bajo') mainGI = 'Medio';
+                found = true;
+            }
+        });
+    }
 
+    // Si hay foto pero no IA ni texto reconocido, damos un genérico
     if (!found && photoInput.files.length > 0) {
         totalCarbs = 30;
         mainGI = 'Medio';
         found = true;
     }
 
-    if (!found) {
-        totalCarbs = 30;
-        mainGI = 'Medio';
+    if (found || description) {
+        if (!found) { totalCarbs = 30; mainGI = 'Medio'; } // Genérico fallback
+        document.getElementById('res-carbs').textContent = `${totalCarbs}g`;
+        document.getElementById('res-gi').textContent = mainGI;
+        resultsPanel.classList.remove('hidden');
+        updateDoseDisplay();
     }
 
-    document.getElementById('res-carbs').textContent = `${totalCarbs}g`;
-    document.getElementById('res-gi').textContent = mainGI;
-    resultsPanel.classList.remove('hidden');
-    updateDoseDisplay();
+    resetAnalyzeButton();
+}
 
+function resetAnalyzeButton() {
+    const analyzeBtn = document.getElementById('analyze-btn');
     analyzeBtn.disabled = false;
     analyzeBtn.textContent = "Analizar";
 }
@@ -149,13 +159,8 @@ async function analyzeFood() {
 async function callGeminiAI(description, file) {
     const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${USER_CONFIG.GEMINI_KEY}`;
 
-    let contents = [];
     let parts = [];
-
-    if (description) {
-        parts.push({ text: `Alimento descrito: ${description}` });
-    }
-
+    if (description) parts.push({ text: `Alimento descrito: ${description}` });
     if (file) {
         const base64 = await fileToBase64(file);
         parts.push({
@@ -166,23 +171,26 @@ async function callGeminiAI(description, file) {
         });
     }
 
-    parts.push({ text: "Analiza nutricionalmente este plato para un paciente con DM1. Estima los gramos totales de carbohidratos netos y el índice glucémico predominante (Alto, Medio, Bajo). Responde ÚNICAMENTE en este formato JSON: {\"carbs\": número, \"gi\": \"Alto/Medio/Bajo\", \"foods_detected\": [\"lista\"]}" });
-
-    contents.push({ parts });
+    parts.push({ text: "Analiza nutricionalmente este plato para un paciente con DM1. Estima los gramos totales de carbohidratos netos y el índice glucémico predominante (Alto, Medio, Bajo). Responde ÚNICAMENTE en este formato JSON: {\"carbs\": número, \"gi\": \"Alto/Medio/Bajo\"}" });
 
     const response = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents })
+        body: JSON.stringify({ contents: [{ parts }] })
     });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || "Error de conexión");
+    }
 
     const data = await response.json();
     try {
-        const text = data.candidates[0].content.parts[0].text;
-        const cleanJson = text.replace(/```json|```/g, '').trim();
+        const textResponse = data.candidates[0].content.parts[0].text;
+        const cleanJson = textResponse.replace(/```json|```/g, '').trim();
         return JSON.parse(cleanJson);
     } catch (e) {
-        throw new Error("Respuesta inválida de Gemini");
+        throw new Error("Respuesta de IA no válida");
     }
 }
 
@@ -267,7 +275,7 @@ function saveRecord() {
     const record = {
         id: Date.now(),
         date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        food: food || "Comida analizada por IA",
+        food: food || "Comida analizada",
         dose, gi
     };
     let history = JSON.parse(localStorage.getItem('dm1_history') || '[]');
