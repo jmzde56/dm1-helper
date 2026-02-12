@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DM1 Helper - Premium Edition</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js');
+        }
+    </script>
+</head>
+
+<body>
+    <div class="app-shell">
+        <!-- Dashboard View -->
+        <section id="view-dashboard" class="view active">
+            <header class="view-header">
+                <div>
+                    <h1 class="premium-title">Resumen <small id="app-version-header"
+                            style="font-size: 0.5em; opacity: 0.5;">v13.2</small></h1>
+                    <p class="subtitle" id="last-update">Actualizado: --:--</p>
+                </div>
+                <div class="glucose-badge" id="main-glucose-badge">
+                    <span id="display-glucose">--</span>
+                    <span class="trend" id="display-trend"></span>
+                </div>
+            </header>
+
+            <div class="chart-container glass">
+                <canvas id="glucose-chart"></canvas>
+            </div>
+
+            <!-- Activity Toggle v11 -->
+            <div class="activity-card glass" id="activity-banner">
+                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                    <div>
+                        <span style="display: block; font-weight: 600; font-size: 0.9rem;">Modo Actividad Física</span>
+                        <small id="activity-desc" style="opacity: 0.6; font-size: 0.7rem;">Normal (ICR 1/15, ISF
+                            70)</small>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="activity-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="quick-stats">
+                <div class="stat-card glass" style="cursor: pointer;">
+                    <span class="stat-label">Insul. Activa (IOB)</span>
+                    <span class="stat-value">0.0 U</span>
+                </div>
+                <div class="stat-card glass" id="tir-card" style="cursor: pointer;">
+                    <span class="stat-label">En Rango (TIR)</span>
+                    <span class="stat-value" id="tir-value">-- %</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Add Food View -->
+        <section id="view-add" class="view">
+            <header class="view-header">
+                <h1 class="premium-title">Nueva Comida</h1>
+            </header>
+
+            <div class="input-card glass">
+                <textarea id="food-description" placeholder="¿Qué vas a comer? (Ej: 2 empanadas de carne)"></textarea>
+                <div class="input-actions">
+                    <button class="btn-secondary" id="camera-trigger">📸</button>
+                    <input type="file" id="food-photo" accept="image/*" capture="environment" hidden>
+                    <button class="btn-primary" id="analyze-btn">Analizar</button>
+                </div>
+            </div>
+
+            <div id="results-panel" class="results-panel glass hidden">
+                <!-- AI Question Panel v13 -->
+                <div id="ai-question-panel" class="ai-question-panel hidden"
+                    style="background: rgba(59, 130, 246, 0.1); border: 1px dashed var(--accent-blue); padding: 1rem; border-radius: 1rem; margin-bottom: 1.5rem;">
+                    <p id="ai-question-text" style="font-size: 0.85rem; margin-bottom: 0.75rem; font-weight: 600;"></p>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="ai-answer-input" placeholder="Tu respuesta..."
+                            style="flex: 1; background: var(--glass-bg); border: 1px solid var(--glass-border); color: white; border-radius: 0.5rem; padding: 0.5rem;">
+                        <button class="btn-primary" id="ai-answer-btn" style="padding: 0.5rem 1rem;">Enviar</button>
+                    </div>
+                </div>
+
+                <div class="nutrients-summary">
+                    <div class="nutrient">
+                        <span class="label">Carbs <small>(Toca para editar)</small></span>
+                        <span id="res-carbs" class="value"
+                            style="cursor: pointer; border-bottom: 2px dashed var(--accent-blue);">0g</span>
+                    </div>
+                    <div class="nutrient">
+                        <span class="label">IG</span>
+                        <span id="res-gi" class="value">--</span>
+                    </div>
+                </div>
+
+                <div class="correction-panel">
+                    <label>Glucemia actual</label>
+                    <input type="number" id="current-glucose" value="100">
+                </div>
+
+                <div class="dose-display">
+                    <span class="dose-label">Dosis Sugerida</span>
+                    <span id="suggested-dose" class="dose-value">0</span>
+                    <span class="dose-unit">unidades</span>
+                </div>
+
+                <button class="btn-primary large" id="save-btn">Registrar Dosis</button>
+            </div>
+        </section>
+
+        <!-- History View -->
+        <section id="view-history" class="view">
+            <header class="view-header">
+                <h1 class="premium-title">Diario</h1>
+                <div id="history-total-stats" style="font-size: 0.7rem; opacity: 0.6; text-align: right;">
+                    Hoy: <span id="day-carbs">0</span>g HC • <span id="day-insulin">0</span>U
+                </div>
+            </header>
+            <div class="history-container">
+                <ul id="history-list" class="hist-list">
+                    <!-- Dynamic Items -->
+                </ul>
+            </div>
+        </section>
+
+        <!-- Settings View -->
+        <section id="view-settings" class="view">
+            <header class="view-header">
+                <h1 class="premium-title">Ajustes</h1>
+            </header>
+            <div class="settings-container glass">
+
+                <div class="settings-section">
+                    <h3 style="font-size: 0.8rem; opacity: 0.5; margin-bottom: 1rem; text-transform: uppercase;">Perfil
+                        Médico</h3>
+                    <div class="config-grid">
+                        <div class="config-group">
+                            <label>Ratio (ICR)</label>
+                            <input type="number" id="cfg-icr" step="0.1">
+                        </div>
+                        <div class="config-group">
+                            <label>Sensib. (ISF)</label>
+                            <input type="number" id="cfg-isf" step="1">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3 style="font-size: 0.8rem; opacity: 0.5; margin: 1.5rem 0 1rem; text-transform: uppercase;">
+                        Conexión Glucosa</h3>
+                    <div class="config-group">
+                        <input type="text" id="cfg-xdrip" placeholder="URL Juggluco/xDrip">
+                        <button class="btn-secondary" id="test-glucose-btn"
+                            style="width: 100%; font-size: 0.7rem; margin-top: 0.5rem;">📡 Probar Glucemia</button>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3 style="font-size: 0.8rem; opacity: 0.5; margin: 1.5rem 0 1rem; text-transform: uppercase;">
+                        Inteligencia Artificial</h3>
+                    <div class="config-group">
+                        <label>ID Modelo</label>
+                        <input type="text" id="cfg-model-custom" placeholder="gemini-flash-latest">
+                    </div>
+                    <div class="config-group">
+                        <label>API Key</label>
+                        <input type="password" id="cfg-gemini" placeholder="Pega tu clave aquí...">
+                        <button class="btn-secondary" id="test-key-1"
+                            style="width: 100%; font-size: 0.7rem; margin-top: 0.4rem;">🧪 Probar Clave</button>
+                    </div>
+                </div>
+
+                <details style="margin-top: 2rem; opacity: 0.4; font-size: 0.7rem;">
+                    <summary style="cursor: pointer; margin-bottom: 1rem;">Opciones Avanzadas</summary>
+                    <div class="config-group">
+                        <label>Ratio Actividad</label>
+                        <input type="number" id="cfg-icr-act" value="25">
+                    </div>
+                    <div class="config-group">
+                        <label>Sensib. Actividad</label>
+                        <input type="number" id="cfg-isf-act" value="100">
+                    </div>
+                    <div class="config-group">
+                        <label>Objetivo</label>
+                        <input type="number" id="cfg-target" step="1" value="100">
+                    </div>
+                    <div class="config-group">
+                        <label>Clave Respaldo</label>
+                        <input type="password" id="cfg-gemini-backup">
+                    </div>
+                    <button class="btn-secondary" id="list-models-btn"
+                        style="width: 100%; font-size: 0.7rem; margin-bottom: 1rem;">📋 Listar Modelos</button>
+                    <div id="models-list-display" class="hidden"></div>
+                    <button id="reset-app-btn"
+                        style="width: 100%; background: none; border: 1px solid #ef4444; color: #ef4444; padding: 0.5rem; border-radius: 0.5rem;">Resetear
+                        Aplicación</button>
+                </details>
+
+                <button class="btn-primary" id="save-settings" style="margin-top: 2rem; width: 100%;">Guardar
+                    Ajustes</button>
+
+                <div style="text-align: center; opacity: 0.5; font-size: 0.7rem; margin-top: 2rem;">
+                    Versión Instalada: <span id="app-version">v13.2</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-view="dashboard">
+                <span class="icon">🏠</span>
+                <span class="label">Inicio</span>
+            </button>
+            <button class="nav-item" data-view="add">
+                <span class="icon">➕</span>
+                <span class="label">Añadir</span>
+            </button>
+            <button class="nav-item" data-view="history">
+                <span class="icon">📜</span>
+                <span class="label">Diario</span>
+            </button>
+            <button class="nav-item" data-view="settings">
+                <span class="icon">⚙️</span>
+                <span class="label">Ajustes</span>
+            </button>
+        </nav>
+    </div>
+    <script src="motor_dm1_v13.2.js"></script>
+</body>
+
+</html>
