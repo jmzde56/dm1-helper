@@ -1,18 +1,29 @@
-const CACHE_NAME = 'dm1-helper-v6';
+const CACHE_NAME = 'dm1-helper-v7';
 const ASSETS = [
     './',
     './index.html',
     './style.css',
-    './main.js',
+    './main_v7.js',
     './manifest.json',
-    'https://cdn.jsdelivr.net/npm/chart.js',
-    'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap'
+    './icon-192.png',
+    './icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
             return cache.addAll(ASSETS);
+        })
+    );
+});
+
+self.addEventListener('activate', (event) => {
+    event.waitUntil(
+        caches.keys().then((keys) => {
+            return Promise.all(
+                keys.filter(key => key !== CACHE_NAME)
+                    .map(key => caches.delete(key))
+            );
         })
     );
 });
