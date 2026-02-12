@@ -97,9 +97,10 @@ async function analyzeFood() {
     resultsPanel.classList.add('hidden');
 
     // Caso 1: Intentar con Gemini si hay API Key
-    if (USER_CONFIG.GEMINI_KEY && USER_CONFIG.GEMINI_KEY.length > 20) {
+    const apiKey = USER_CONFIG.GEMINI_KEY ? USER_CONFIG.GEMINI_KEY.trim() : '';
+    if (apiKey && apiKey.length > 10) {
         try {
-            const result = await callGeminiAI(description, photoInput.files[0]);
+            const result = await callGeminiAI(description, photoInput.files[0], apiKey);
             if (result && result.carbs !== undefined) {
                 document.getElementById('res-carbs').textContent = `${result.carbs}g`;
                 document.getElementById('res-gi').textContent = result.gi || 'Medio';
@@ -116,9 +117,9 @@ async function analyzeFood() {
             }
         } catch (e) {
             console.error("Gemini Error Final:", e);
-            alert("⚠️ IA no disponible temporalmente: " + e.message + "\n\nSe usará la estimación básica local.");
+            alert("⚠️ IA no disponible: " + e.message + "\n\nSe usará la estimación básica local.");
         }
-    } else if (photoInput.files.length > 0 && !USER_CONFIG.GEMINI_KEY) {
+    } else if (photoInput.files.length > 0 && !apiKey) {
         alert("Configura tu Gemini API Key en Ajustes para analizar fotos.");
     }
 
@@ -142,7 +143,7 @@ async function analyzeFood() {
     }
 
     if (!found && photoInput.files.length > 0) {
-        totalCarbs = 30; // Genérico para fotos sin IA
+        totalCarbs = 30;
         mainGI = 'Medio';
         found = true;
     }
@@ -164,19 +165,21 @@ function resetAnalyzeButton() {
     analyzeBtn.textContent = "Analizar";
 }
 
-async function callGeminiAI(description, file) {
-    // Lista de modelos a probar en orden de estabilidad
-    const models = ["gemini-1.5-flash", "gemini-1.5-flash-latest"];
+async function callGeminiAI(description, file, apiKey) {
+    // Probamos primero con el nombre de modelo más estándar
+    const models = ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro"];
     let lastError = "";
 
     for (const model of models) {
         try {
-            // Usamos v1beta para mayor compatibilidad con Flash
-            const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${USER_CONFIG.GEMINI_KEY}`;
+            // Usamos v1beta ya que suele ser más flexible con modelos flash y latest
+            const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
             let parts = [];
-            if (description && !description.includes("analizando")) {
-                parts.push({ text: `Contexto del usuario: ${description}` });
+            // Si hay descripción y no es un placeholder de carga
+            const isPlaceholder = description.includes("analizando") || description.includes("foto seleccionada");
+            if (description && !isPlaceholder) {
+                parts.push({ text: `Información del usuario: ${description}` });
             }
 
             if (file) {
@@ -189,7 +192,7 @@ async function callGeminiAI(description, file) {
                 });
             }
 
-            parts.push({ text: "Analiza nutricionalmente este plato para un paciente con DM1. Identifica los alimentos específicos. Estima los gramos totales de carbohidratos netos y el índice glucémico (Alto, Medio o Bajo). Responde ÚNICAMENTE en este formato JSON: {\"carbs\": número, \"gi\": \"Alto/Medio/Bajo\", \"foods_detected\": [\"lista de alimentos\"]}" });
+            parts.push({ text: "Actúa como un experto en nutrición para diabetes tipo 1. Analiza esta comida. Estima carbohidratos netos (número) e índice glucémico (Alto, Medio o Bajo). Responde solo en JSON: {\"carbs\": número, \"gi\": \"Alto/Medio/Bajo\", \"foods_detected\": [\"lista de alimentos detectados\"]}" });
 
             const response = await fetch(API_URL, {
                 method: 'POST',
@@ -197,30 +200,30 @@ async function callGeminiAI(description, file) {
                 body: JSON.stringify({ contents: [{ parts }] })
             });
 
+            const data = await response.json();
+
             if (!response.ok) {
-                const err = await response.json().catch(() => ({}));
-                // Si el error es específicamente de "modelo no encontrado", probamos el siguiente
-                if (response.status === 404) {
-                    lastError = err.error?.message || "Model not found";
+                // Si el modelo no existe, probamos el siguiente
+                if (data.error?.message?.toLowerCase().includes("not found")) {
+                    lastError = data.error.message;
                     continue;
                 }
-                throw new Error(err.error?.message || `HTTP ${response.status}`);
+                throw new Error(data.error?.message || `Error ${response.status}`);
             }
 
-            const data = await response.json();
             const textResponse = data.candidates[0].content.parts[0].text;
             const cleanJson = textResponse.replace(/```json|```/g, '').trim();
             return JSON.parse(cleanJson);
 
         } catch (e) {
-            console.warn(`Intento con ${model} falló:`, e);
+            console.warn(`Falló intento con modelo ${model}:`, e);
             lastError = e.message;
-            // Si el error no es de "not found" (p.ej. API Key inválida), cortamos la ejecución
-            if (!e.message.toLowerCase().includes("not found")) break;
+            // Si el error es de autenticación o cuota, no reintentamos con otros modelos
+            if (e.message.toLowerCase().includes("key") || e.message.toLowerCase().includes("quota")) break;
         }
     }
 
-    throw new Error(lastError || "No se pudo conectar con la IA tras varios intentos.");
+    throw new Error(lastError || "No se pudo comunicar con el servicio de IA.");
 }
 
 function fileToBase64(file) {
@@ -240,6 +243,7 @@ function updateDoseDisplay() {
     const carbsDose = carbs / USER_CONFIG.ICR;
     const correctionDose = (currentG - USER_CONFIG.TARGET_GLUCOSE) / USER_CONFIG.ISF;
 
+    // Redondeo a número entero como solicitó el usuario
     const totalDose = Math.max(0, carbsDose + correctionDose);
     document.getElementById('suggested-dose').textContent = Math.round(totalDose);
 }
@@ -291,7 +295,7 @@ function saveSettings() {
     USER_CONFIG.ISF = parseFloat(document.getElementById('cfg-isf').value) || 50;
     USER_CONFIG.TARGET_GLUCOSE = parseFloat(document.getElementById('cfg-target').value) || 100;
     USER_CONFIG.XDRIP_URL = document.getElementById('cfg-xdrip').value;
-    USER_CONFIG.GEMINI_KEY = document.getElementById('cfg-gemini').value;
+    USER_CONFIG.GEMINI_KEY = document.getElementById('cfg-gemini').value.trim(); // Trim API Key
     localStorage.setItem('dm1_config', JSON.stringify(USER_CONFIG));
     alert("✓ Ajustes guardados");
     if (USER_CONFIG.XDRIP_URL) fetchxDripGlucose();
