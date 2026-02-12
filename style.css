@@ -1,0 +1,406 @@
+:root {
+    --bg-dark: #07090e;
+    --accent-blue: #3b82f6;
+    --accent-purple: #8b5cf6;
+    --text-main: #ffffff;
+    --text-dim: #94a3b8;
+    --glass-bg: rgba(255, 255, 255, 0.03);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --nav-height: 75px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    font-family: 'Outfit', sans-serif;
+    background: radial-gradient(circle at top right, #1e1b4b, #07090e);
+    color: var(--text-main);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+}
+
+.app-shell {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Views Management */
+.view {
+    display: none;
+    flex: 1;
+    padding: 1.5rem;
+    padding-bottom: calc(var(--nav-height) + 1.5rem);
+    overflow-y: auto;
+    animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.view.active {
+    display: block;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Typography */
+.premium-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    background: linear-gradient(to bottom right, #fff, #94a3b8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+}
+
+/* Components */
+.glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: 1.5rem;
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+}
+
+.view-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-top: 1rem;
+}
+
+/* Glucose Badge */
+.glucose-badge {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.2));
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    padding: 0.75rem 1rem;
+    border-radius: 1rem;
+    text-align: center;
+    min-width: 80px;
+}
+
+#display-glucose {
+    font-size: 1.5rem;
+    font-weight: 700;
+    display: block;
+}
+
+.trend {
+    font-size: 0.9rem;
+    color: var(--accent-blue);
+}
+
+/* Bottom Nav */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: var(--nav-height);
+    background: rgba(7, 9, 14, 0.8);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border-top: 1px solid var(--glass-border);
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    padding: 0.5rem 1rem;
+    z-index: 1000;
+}
+
+.nav-item {
+    background: none;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    color: var(--text-dim);
+    font-family: inherit;
+    transition: all 0.3s ease;
+}
+
+.nav-item .icon {
+    font-size: 1.4rem;
+}
+
+.nav-item .label {
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+
+.nav-item.active {
+    color: var(--accent-blue);
+    transform: translateY(-2px);
+}
+
+/* Add Food Section */
+.input-card textarea {
+    width: 100%;
+    min-height: 120px;
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 1.1rem;
+    font-family: inherit;
+    resize: none;
+    outline: none;
+    margin-bottom: 1rem;
+}
+
+.input-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+
+/* Buttons */
+.btn-primary {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    border: none;
+    padding: 0.85rem 1.5rem;
+    border-radius: 1rem;
+    font-weight: 600;
+    font-family: inherit;
+    flex: 1;
+    box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+}
+
+.btn-secondary {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    color: white;
+    padding: 0.85rem;
+    border-radius: 1rem;
+    font-size: 1.2rem;
+}
+
+.btn-primary.large {
+    width: 100%;
+    padding: 1.1rem;
+    font-size: 1.1rem;
+    margin-top: 1rem;
+}
+
+/* Dashboard Cards */
+.quick-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.stat-card {
+    text-align: center;
+    padding: 1.25rem !important;
+}
+
+.stat-label {
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.stat-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+/* Results Panel */
+.nutrients-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.nutrient .value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--accent-blue);
+}
+
+.correction-panel {
+    border-top: 1px solid var(--glass-border);
+    padding-top: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.correction-panel input {
+    width: 100%;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    padding: 1rem;
+    border-radius: 1rem;
+    color: white;
+    font-size: 1.25rem;
+    text-align: center;
+    margin-top: 0.5rem;
+}
+
+.dose-display {
+    text-align: center;
+    padding: 1.5rem;
+    background: rgba(59, 130, 246, 0.1);
+    border-radius: 1.25rem;
+}
+
+.dose-value {
+    font-size: 3.5rem;
+    font-weight: 700;
+    color: #60a5fa;
+    display: block;
+    line-height: 1;
+}
+
+.dose-unit {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+}
+
+/* History & Settings */
+.hidden {
+    display: none !important;
+}
+
+.history-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 1.25rem 0;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.history-item:last-child {
+    border: none;
+}
+
+.config-group {
+    margin-bottom: 1.25rem;
+}
+
+.config-group label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    margin-bottom: 0.5rem;
+}
+
+.config-group input {
+    width: 100%;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    padding: 1rem;
+    border-radius: 1rem;
+    color: white;
+    font-size: 1rem;
+}
+
+#glucose-chart {
+    height: 180px !important;
+}
+
+.badge-juggluco {
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--accent-blue);
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    margin-left: 4px;
+    vertical-align: middle;
+    text-transform: uppercase;
+    font-weight: 700;
+}
+
+/* Switch UI - v11 */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 22px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.1);
+    transition: .4s;
+    border-radius: 22px;
+    border: 1px solid var(--glass-border);
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked+.slider {
+    background-color: var(--accent-blue);
+}
+
+input:checked+.slider:before {
+    transform: translateX(22px);
+}
+
+.activity-card {
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.activity-card.active {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
+}
+
+.config-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.settings-section {
+    margin-bottom: 2rem;
+}
