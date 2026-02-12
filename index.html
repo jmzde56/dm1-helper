@@ -24,7 +24,8 @@
         <section id="view-dashboard" class="view active">
             <header class="view-header">
                 <div>
-                    <h1 class="premium-title">Resumen <small style="font-size: 0.5em; opacity: 0.5;">v8.1</small></h1>
+                    <h1 class="premium-title">Resumen <small id="app-version-header"
+                            style="font-size: 0.5em; opacity: 0.5;">v9.0</small></h1>
                     <p class="subtitle" id="last-update">Actualizado: --:--</p>
                 </div>
                 <div class="glucose-badge" id="main-glucose-badge">
@@ -133,9 +134,12 @@
                         una gratis en <a href="https://aistudio.google.com/app/apikey" target="_blank"
                             style="color: var(--accent-blue);">AI Studio</a></small>
                 </div>
-                <button class="btn-primary" id="save-settings">Guardar Cambios</button>
-                <div style="text-align: center; margin-top: 2rem; opacity: 0.5; font-size: 0.7rem;">
-                    Versión Instalada: <span id="app-version">v8.0</span>
+                <button class="btn-primary" id="save-settings" style="margin-bottom: 1rem;">Guardar Cambios</button>
+                <button class="btn-secondary" id="test-api-btn"
+                    style="width: 100%; font-size: 0.8rem; margin-bottom: 2rem;">🌩️ Probar Conexión IA</button>
+
+                <div style="text-align: center; opacity: 0.5; font-size: 0.7rem;">
+                    Versión Instalada: <span id="app-version">v9.0</span>
                 </div>
             </div>
         </section>
@@ -160,7 +164,7 @@
             </button>
         </nav>
     </div>
-    <script src="main_v8.js"></script>
+    <script src="motor_dm1_v9.js"></script>
 </body>
 
 </html>
