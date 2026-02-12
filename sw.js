@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dm1-helper-v8';
+const CACHE_NAME = 'dm1-helper-v8.1';
 const ASSETS = [
     './',
     './index.html',
