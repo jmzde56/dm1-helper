@@ -1,9 +1,9 @@
-const CACHE_NAME = 'dm1-helper-v9.1';
+const CACHE_NAME = 'dm1-helper-v9.2';
 const ASSETS = [
     './',
     './index.html',
     './style.css',
-    './motor_dm1_v9.1.js',
+    './motor_dm1_v9.2.js',
     './manifest.json',
     './icon-192.png',
     './icon-512.png'
