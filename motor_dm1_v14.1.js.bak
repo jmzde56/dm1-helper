@@ -19,7 +19,6 @@ let jugglucoTreatments = [];
 let glucoseStats = { tir: 0, low: 0, high: 0 };
 let lastInjection = { dose: 0, time: '--:--' };
 let selectedTrend = 'flat';
-let glucoseChart;
 
 document.addEventListener('DOMContentLoaded', () => {
     updateUIElements();
@@ -30,11 +29,9 @@ document.addEventListener('DOMContentLoaded', () => {
     syncUI();
 
     checkActivityTimer(); // Verificar si el modo actividad expiró
-    checkPizzaReminders();
     refreshDashboardData();
     setInterval(refreshDashboardData, 300000);
     setInterval(checkActivityTimer, 60000); // Check cada minuto
-    setInterval(checkPizzaReminders, 60000);
 });
 
 function updateUIElements() {
@@ -282,47 +279,9 @@ async function fetchGlucose() {
 
             updateDoseDisplay();
             document.getElementById('last-update').textContent = "Hoy: " + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            updateChart(d);
         }
     } catch (e) { console.error("Error G:", e); }
 }
-
-function updateChart(sgvData) {
-    if (!glucoseChart || !sgvData || sgvData.length === 0) return;
-
-    const now = Date.now();
-    // 4 hours in ms
-    const fourHoursAgo = now - (4 * 60 * 60 * 1000);
-
-    // Sort by date ascending
-    const sortedData = sgvData
-        .filter(v => {
-            let ts = v.date || v.mills || 0;
-            if (isNaN(ts)) ts = new Date(ts).getTime();
-            return ts >= fourHoursAgo;
-        })
-        .sort((a, b) => {
-            let tsA = a.date || a.mills || 0;
-            let tsB = b.date || b.mills || 0;
-            if (isNaN(tsA)) tsA = new Date(tsA).getTime();
-            if (isNaN(tsB)) tsB = new Date(tsB).getTime();
-            return tsA - tsB;
-        });
-
-    const labels = sortedData.map(v => {
-        let ts = v.date || v.mills || 0;
-        if (isNaN(ts)) ts = new Date(ts).getTime();
-        const d = new Date(ts);
-        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    });
-
-    const data = sortedData.map(v => v.sgv);
-
-    glucoseChart.data.labels = labels;
-    glucoseChart.data.datasets[0].data = data;
-    glucoseChart.update();
-}
-
 
 async function fetchTreatments() {
     if (!USER_CONFIG.XDRIP_URL) return;
@@ -427,14 +386,10 @@ function saveRecord() {
     if (isPizza && fullDose > 0) {
         doseNow = fullDose / 2;
         alert(`🍕 EFECTO PIZZA\n\nInyecta ${doseNow} UI ahora.\nTe avisaré en 2 horas para inyectar las otras ${doseNow} UI.`);
-        // Guardar recordatorio persistente
-        let reminders = JSON.parse(localStorage.getItem('dm1_reminders') || '[]');
-        reminders.push({
-            time: Date.now() + 7200000, // 2 horas
-            message: `🔔 RECORDATORIO: Inyectar 2da dosis (${doseNow} UI) para cubrir grasas/proteínas.`,
-            shown: false
-        });
-        localStorage.setItem('dm1_reminders', JSON.stringify(reminders));
+        // Simulación de recordatorio diferido
+        setTimeout(() => {
+            alert(`🔔 RECORDATORIO: Inyectar 2da dosis (${doseNow} UI) para cubrir grasas/proteínas.`);
+        }, 7200000); // 2 horas
     }
 
     const record = {
@@ -556,23 +511,3 @@ async function resizeImage(file, maxSize) {
 function testKey(i, b, l) { alert("Test IA"); }
 function testGlucoseConnection() { alert("Test G"); }
 function listPossibleModels() { alert("List M"); }
-
-function checkPizzaReminders() {
-    let reminders = JSON.parse(localStorage.getItem('dm1_reminders') || '[]');
-    const now = Date.now();
-    let updated = false;
-
-    reminders.forEach(r => {
-        if (!r.shown && now >= r.time) {
-            alert(r.message);
-            r.shown = true;
-            updated = true;
-        }
-    });
-
-    if (updated) {
-        // Remove shown reminders
-        reminders = reminders.filter(r => !r.shown);
-        localStorage.setItem('dm1_reminders', JSON.stringify(reminders));
-    }
-}
